@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Color Space Analyzer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #container {
+            width: 800px;
+            height: 600px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+        #controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #imagePreview {
+            max-width: 300px;
+            margin: 10px auto;
+            display: block;
+        }
+        #buttonContainer {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        #toggleRotation {
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        #toggleRotation:hover {
+            background-color: #45a049;
+        }
+        .axisButton {
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 0 5px;
+        }
+        #rButton { background-color: #ff4444; }
+        #gButton { background-color: #44ff44; }
+        #bButton { background-color: #4444ff; }
+        .axisButton:hover { opacity: 0.8; }
+        .axisButton.active { opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input type="file" id="imageInput" accept="image/*">
+        <img id="imagePreview" alt="Preview">
+    </div>
+    <div id="buttonContainer">
+        <button id="toggleRotation">Stop Rotation</button>
+        <button id="rButton" class="axisButton">R</button>
+        <button id="gButton" class="axisButton">G</button>
+        <button id="bButton" class="axisButton">B</button>
+    </div>
+    <div id="container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script>
+        // Three.js setup
+        const container = document.getElementById('container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        const light = new THREE.PointLight(0xffffff, 1, 1000);
+        light.position.set(50, 50, 50);
+        scene.add(light);
+
+        camera.position.z = 100;
+
+        // Add axes
+        const axisLength = 60;
+        
+        const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-axisLength, 0, 0),
+            new THREE.Vector3(axisLength, 0, 0)
+        ]);
+        const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+        const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
+        scene.add(xAxis);
+
+        const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -axisLength, 0),
+            new THREE.Vector3(0, axisLength, 0)
+        ]);
+        const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+        const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
+        scene.add(yAxis);
+
+        const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, -axisLength),
+            new THREE.Vector3(0, 0, axisLength)
+        ]);
+        const zAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+        const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
+        scene.add(zAxis);
+
+        function createLabel(text, color, position) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 64;
+            canvas.height = 32;
+            context.font = '20px Arial';
+            context.fillStyle = color;
+            context.fillText(text, 0, 24);
+            const texture = new THREE.Texture(canvas);
+            texture.needsUpdate = true;
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(10, 5, 1);
+            sprite.position.copy(position);
+            return sprite;
+        }
+
+        // Create axis groups to manage labels with their axes
+        const xAxisGroup = new THREE.Group();
+        const yAxisGroup = new THREE.Group();
+        const zAxisGroup = new THREE.Group();
+        
+        xAxisGroup.add(xAxis);
+        yAxisGroup.add(yAxis);
+        zAxisGroup.add(zAxis);
+        
+        scene.add(xAxisGroup);
+        scene.add(yAxisGroup);
+        scene.add(zAxisGroup);
+
+        // Numerical labels on the axes
+        const labelPositions = [-50, -25, 0, 25, 50];
+        const rgbValues = [0, 63.75, 127.5, 191.25, 255];
+
+        // X axis (Red) labels
+        labelPositions.forEach((pos, index) => {
+            const label = createLabel(rgbValues[index].toString(), '#ff0000', new THREE.Vector3(pos, 0, 0));
+            xAxisGroup.add(label);
+        });
+
+        // Y axis (Green) labels
+        labelPositions.forEach((pos, index) => {
+            const label = createLabel(rgbValues[index].toString(), '#00ff00', new THREE.Vector3(0, pos, 0));
+            yAxisGroup.add(label);
+        });
+
+        // Z axis (Blue) labels
+        labelPositions.forEach((pos, index) => {
+            const label = createLabel(rgbValues[index].toString(), '#0000ff', new THREE.Vector3(0, 0, pos));
+            zAxisGroup.add(label);
+        });
+
+        const xLabel = createLabel('Red', '#ff0000', new THREE.Vector3(axisLength + 5, 0, 0));
+        xAxisGroup.add(xLabel);
+
+        const yLabel = createLabel('Green', '#00ff00', new THREE.Vector3(0, axisLength + 5, 0));
+        yAxisGroup.add(yLabel);
+
+        const zLabel = createLabel('Blue', '#0000ff', new THREE.Vector3(0, 0, axisLength + 5));
+        zAxisGroup.add(zLabel);
+
+        // Image handling
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        let points;
+
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    imagePreview.src = event.target.result;
+                    analyzeImage(event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function analyzeImage(imageSrc) {
+            if (points) {
+                scene.remove(points);
+            }
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, img.width, img.height).data;
+
+                const geometry = new THREE.BufferGeometry();
+                const positions = [];
+                const colors = [];
+
+                for (let i = 0; i < imageData.length; i += 4) {
+                    const r = imageData[i];
+                    const g = imageData[i + 1];
+                    const b = imageData[i + 2];
+
+                    const x = (r - 127.5) / 2.55;
+                    const y = (g - 127.5) / 2.55;
+                    const z = (b - 127.5) / 2.55;
+
+                    positions.push(x, y, z);
+                    colors.push(r / 255, g / 255, b / 255);
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+                const material = new THREE.PointsMaterial({
+                    size: 0.5,
+                    vertexColors: true
+                });
+                
+                points = new THREE.Points(geometry, material);
+                scene.add(points);
+
+                animate();
+            };
+            img.src = imageSrc;
+        }
+
+        // Rotation control
+        let isRotating = true;
+        let activeAxis = null;
+        const toggleButton = document.getElementById('toggleRotation');
+        const rButton = document.getElementById('rButton');
+        const gButton = document.getElementById('gButton');
+        const bButton = document.getElementById('bButton');
+
+        toggleButton.addEventListener('click', function() {
+            isRotating = !isRotating;
+            toggleButton.textContent = isRotating ? 'Stop Rotation' : 'Start Rotation';
+            toggleButton.style.backgroundColor = isRotating ? '#4CAF50' : '#f44336';
+        });
+
+        function setActiveAxis(axis) {
+            activeAxis = axis;
+            [rButton, gButton, bButton].forEach(btn => btn.classList.remove('active'));
+            if (axis === 'x') {
+                rButton.classList.add('active');
+                points.rotation.set(0, 0, 0);
+                xAxisGroup.rotation.set(0, 0, 0);
+                yAxisGroup.rotation.set(0, 0, 0);
+                zAxisGroup.rotation.set(0, 0, 0);
+            } else if (axis === 'y') {
+                rButton.classList.remove('active');
+                gButton.classList.add('active');
+                points.rotation.set(0, Math.PI/2, 0);
+                xAxisGroup.rotation.set(0, Math.PI/2, 0);
+                yAxisGroup.rotation.set(0, Math.PI/2, 0);
+                zAxisGroup.rotation.set(0, Math.PI/2, 0);
+            } else if (axis === 'z') {
+                rButton.classList.remove('active');
+                bButton.classList.add('active');
+                points.rotation.set(Math.PI/2, 0, 0);
+                xAxisGroup.rotation.set(Math.PI/2, 0, 0);
+                yAxisGroup.rotation.set(Math.PI/2, 0, 0);
+                zAxisGroup.rotation.set(Math.PI/2, 0, 0);
+            }
+        }
+
+        rButton.addEventListener('click', () => setActiveAxis('x'));
+        gButton.addEventListener('click', () => setActiveAxis('y'));
+        bButton.addEventListener('click', () => setActiveAxis('z'));
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (points && isRotating) {
+                if (!activeAxis) {
+                    points.rotation.x += 0.005;
+                    points.rotation.y += 0.005;
+                    xAxisGroup.rotation.x += 0.005;
+                    xAxisGroup.rotation.y += 0.005;
+                    yAxisGroup.rotation.x += 0.005;
+                    yAxisGroup.rotation.y += 0.005;
+                    zAxisGroup.rotation.x += 0.005;
+                    zAxisGroup.rotation.y += 0.005;
+                } else if (activeAxis === 'x') {
+                    points.rotation.y += 0.005;
+                    xAxisGroup.rotation.y += 0.005;
+                    yAxisGroup.rotation.y += 0.005;
+                    zAxisGroup.rotation.y += 0.005;
+                } else if (activeAxis === 'y') {
+                    points.rotation.x += 0.005;
+                    xAxisGroup.rotation.x += 0.005;
+                    yAxisGroup.rotation.x += 0.005;
+                    zAxisGroup.rotation.x += 0.005;
+                } else if (activeAxis === 'z') {
+                    points.rotation.y += 0.005;
+                    xAxisGroup.rotation.y += 0.005;
+                    yAxisGroup.rotation.y += 0.005;
+                    zAxisGroup.rotation.y += 0.005;
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Mouse controls
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        container.addEventListener('mousedown', function(e) {
+            isDragging = true;
+        });
+
+        container.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                const deltaMove = {
+                    x: e.offsetX - previousMousePosition.x,
+                    y: e.offsetY - previousMousePosition.y
+                };
+
+                if (points) {
+                    points.rotation.y += deltaMove.x * 0.005;
+                    points.rotation.x += deltaMove.y * 0.005;
+                    xAxisGroup.rotation.y += deltaMove.x * 0.005;
+                    xAxisGroup.rotation.x += deltaMove.y * 0.005;
+                    yAxisGroup.rotation.y += deltaMove.x * 0.005;
+                    yAxisGroup.rotation.x += deltaMove.y * 0.005;
+                    zAxisGroup.rotation.y += deltaMove.x * 0.005;
+                    zAxisGroup.rotation.x += deltaMove.y * 0.005;
+                }
+
+                previousMousePosition = {
+                    x: e.offsetX,
+                    y: e.offsetY
+                };
+            }
+        });
+
+        container.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        renderer.render(scene, camera);
+    </script>
+</body>
+</html>
